@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ShipReady — AI-powered PR descriptions & commit messages</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #050508;
+  --surface: #0d0d14;
+  --surface2: #12121c;
+  --gold: #f5c842;
+  --gold-dim: rgba(245,200,66,0.12);
+  --blue: #4f8fff;
+  --blue-dim: rgba(79,143,255,0.12);
+  --green: #3ecf8e;
+  --green-dim: rgba(62,207,142,0.12);
+  --white: #f0f0f8;
+  --muted: #6b6b88;
+  --border: rgba(255,255,255,0.07);
+  --radius: 14px;
+}
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Space Grotesk', sans-serif;
+  background: var(--bg);
+  color: var(--white);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 0; opacity: 0.5;
+}
+/* NAV */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1.1rem 2.5rem;
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  background: rgba(5,5,8,0.75);
+}
+.nav-brand {
+  display: flex; align-items: center; gap: 0.75rem;
+  text-decoration: none;
+}
+.nav-logo-icon {
+  width: 32px; height: 32px;
+  background: var(--gold);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+}
+.nav-logo-text {
+  font-family: 'Space Mono', monospace;
+  font-size: 1rem;
+  color: var(--white);
+  letter-spacing: -0.02em;
+}
+.nav-logo-text span { color: var(--gold); }
+.nav-right {
+  display: flex; align-items: center; gap: 1rem;
+}
+.nav-link {
+  color: var(--muted); font-size: 0.85rem; text-decoration: none;
+  transition: color 0.2s;
+}
+.nav-link:hover { color: var(--white); }
+.nav-badge {
+  background: var(--gold-dim);
+  color: var(--gold);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  padding: 0.25rem 0.65rem;
+  border-radius: 100px;
+  border: 1px solid rgba(245,200,66,0.2);
+}
+/* HERO */
+.hero {
+  position: relative; z-index: 1;
+  padding: 5rem 2.5rem 3rem;
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto;
+}
+.hero-tag {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--gold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 1.25rem;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+}
+.hero-tag::before, .hero-tag::after {
+  content: ''; display: block;
+  width: 30px; height: 1px;
+  background: var(--gold); opacity: 0.4;
+}
+.hero h1 {
+  font-size: clamp(2.2rem, 5vw, 3.8rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin-bottom: 1.25rem;
+}
+.hero h1 .accent {
+  background: linear-gradient(135deg, var(--gold) 0%, #ff9f43 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero-sub {
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.7;
+  margin-bottom: 2rem;
+}
+/* MODE TABS */
+.mode-tabs {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  padding: 4px;
+  gap: 2px;
+  width: fit-content;
+  margin: 0 auto 3rem;
+}
+.mode-tab {
+  padding: 0.5rem 1.25rem;
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'Space Grotesk', sans-serif;
+}
+.mode-tab.active {
+  background: var(--gold);
+  color: #0a0800;
+  font-weight: 600;
+}
+.mode-tab:not(.active):hover { color: var(--white); }
+
+/* MAIN LAYOUT */
+.app {
+  position: relative; z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 2.5rem 6rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+/* PANELS */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+.panel-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.panel-title {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.panel-actions {
+  display: flex; gap: 0.5rem;
+}
+.btn-sm {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.3rem 0.75rem;
+  border-radius: 100px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  transition: all 0.2s;
+}
+.btn-sm:hover { color: var(--white); border-color: rgba(255,255,255,0.15); }
+.btn-sm.gold {
+  background: var(--gold);
+  color: #0a0800;
+  border-color: var(--gold);
+  font-weight: 600;
+}
+.btn-sm.gold:hover {
+  box-shadow: 0 4px 16px rgba(245,200,66,0.35);
+  transform: translateY(-1px);
+}
+.btn-sm.copied {
+  background: var(--green-dim);
+  color: var(--green);
+  border-color: rgba(62,207,142,0.3);
+}
+
+/* TEXTAREA */
+textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--white);
+  font-family: 'Space Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 1.65;
+  padding: 1.25rem;
+  resize: none;
+  min-height: 340px;
+}
+textarea::placeholder { color: var(--muted); }
+textarea:focus { outline: none; }
+
+/* API KEY SECTION */
+.api-section {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; gap: 0.75rem; align-items: center;
+}
+.api-input-wrap {
+  flex: 1;
+  display: flex; align-items: center; gap: 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  transition: border-color 0.2s;
+}
+.api-input-wrap:focus-within {
+  border-color: rgba(245,200,66,0.35);
+}
+.api-key-icon { color: var(--muted); font-size: 0.85rem; flex-shrink: 0; }
+.api-input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--white); font-family: 'Space Mono', monospace;
+  font-size: 0.78rem; min-width: 0;
+}
+.api-input::placeholder { color: var(--muted); }
+.api-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.api-hint a { color: var(--blue); text-decoration: none; }
+.api-hint a:hover { text-decoration: underline; }
+
+/* OUTPUT */
+.output-area {
+  min-height: 340px;
+  padding: 1.25rem;
+  font-size: 0.88rem;
+  line-height: 1.75;
+  color: var(--white);
+}
+.output-placeholder {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.7;
+  height: 100%;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  text-align: center;
+  gap: 1rem;
+  min-height: 300px;
+}
+.output-placeholder-icon { font-size: 2.5rem; opacity: 0.4; }
+.output-placeholder-text { max-width: 240px; }
+.output-section { margin-bottom: 1.5rem; }
+.output-section:last-child { margin-bottom: 0; }
+.output-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--gold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+.output-content {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: var(--white);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.output-content.commit { color: var(--green); }
+.checklist-item {
+  display: flex; align-items: flex-start; gap: 0.5rem;
+  margin-bottom: 0.4rem; font-size: 0.88rem;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.checklist-item::before {
+  content: '☐'; color: var(--gold); flex-shrink: 0;
+  font-size: 0.9rem; line-height: 1.5;
+}
+
+/* GENERATE BUTTON */
+.generate-wrap {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+.btn-generate {
+  width: 100%;
+  background: var(--gold);
+  color: #0a0800;
+  border: none;
+  border-radius: 10px;
+  padding: 0.9rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+}
+.btn-generate:hover {
+  box-shadow: 0 6px 24px rgba(245,200,66,0.4);
+  transform: translateY(-1px);
+}
+.btn-generate:disabled {
+  opacity: 0.5; cursor: not-allowed;
+  transform: none; box-shadow: none;
+}
+.btn-generate.loading {
+  background: var(--surface2);
+  color: var(--gold);
+  border: 1px solid rgba(245,200,66,0.3);
+}
+
+/* SPINNER */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(245,200,66,0.3);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* LOADING OVERLAY */
+.loading-dots {
+  display: flex; gap: 0.3rem; justify-content: center;
+  padding: 2rem 0;
+}
+.loading-dots span {
+  width: 6px; height: 6px;
+  background: var(--gold);
+  border-radius: 50%;
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* EXAMPLES */
+.examples {
+  position: relative; z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto 0;
+  padding: 0 2.5rem 1.5rem;
+}
+.examples-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+.example-chips {
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+}
+.example-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 100px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.example-chip:hover {
+  border-color: rgba(245,200,66,0.3);
+  color: var(--gold);
+}
+
+/* ERROR */
+.error-banner {
+  background: rgba(255,80,80,0.1);
+  border: 1px solid rgba(255,80,80,0.25);
+  color: #ff8080;
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  margin: 0.75rem 1.25rem;
+}
+
+/* FOOTER */
+footer {
+  position: relative; z-index: 1;
+  border-top: 1px solid var(--border);
+  padding: 1.5rem 2.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.footer-left {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.footer-left a { color: var(--gold); text-decoration: none; }
+.footer-right { font-size: 0.8rem; color: var(--muted); }
+.footer-right a { color: var(--muted); text-decoration: none; transition: color 0.2s; }
+.footer-right a:hover { color: var(--white); }
+
+/* PRIVACY NOTE */
+.privacy-note {
+  position: relative; z-index: 1;
+  max-width: 1100px; margin: 0 auto;
+  padding: 0.5rem 2.5rem 2rem;
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.privacy-note::before {
+  content: '🔒'; font-size: 0.85rem;
+}
+
+@media (max-width: 800px) {
+  .app { grid-template-columns: 1fr; padding: 0 1.25rem 4rem; }
+  .hero { padding: 3rem 1.25rem 2rem; }
+  .examples { padding: 0 1.25rem 1.5rem; }
+  nav { padding: 1rem 1.25rem; }
+  footer { flex-direction: column; gap: 0.75rem; text-align: center; padding: 1.25rem; }
+  .privacy-note { padding: 0 1.25rem 1.5rem; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="nav-brand">
+    <div class="nav-logo-icon">🚀</div>
+    <span class="nav-logo-text">Ship<span>Ready</span></span>
+  </a>
+  <div class="nav-right">
+    <span class="nav-badge">AI-powered</span>
+    <a href="https://luciferankon.dev" class="nav-link" target="_blank">by luciferankon</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-tag">Developer Tool</div>
+  <h1>Stop writing <span class="accent">boring PRs.</span></h1>
+  <p class="hero-sub">Paste your diff or describe your changes. Get a polished PR description, commit message, and release notes — ready to ship.</p>
+  <div class="mode-tabs" id="modeTabs">
+    <button class="mode-tab active" data-mode="pr">PR Description</button>
+    <button class="mode-tab" data-mode="commit">Commit Message</button>
+    <button class="mode-tab" data-mode="release">Release Notes</button>
+  </div>
+</div>
+
+<div class="examples">
+  <div class="examples-label">// Try an example</div>
+  <div class="example-chips">
+    <span class="example-chip" data-example="auth">Auth refactor</span>
+    <span class="example-chip" data-example="perf">Performance fix</span>
+    <span class="example-chip" data-example="api">New API endpoint</span>
+    <span class="example-chip" data-example="bug">Bug fix</span>
+    <span class="example-chip" data-example="db">Database migration</span>
+  </div>
+</div>
+
+<div class="app">
+  <!-- INPUT PANEL -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">// Input</span>
+      <div class="panel-actions">
+        <button class="btn-sm" id="clearBtn">Clear</button>
+      </div>
+    </div>
+    <div class="api-section">
+      <div class="api-input-wrap">
+        <span class="api-key-icon">🔑</span>
+        <input type="password" class="api-input" id="apiKey" placeholder="sk-ant-... (your Anthropic API key)" autocomplete="off" />
+      </div>
+      <span class="api-hint"><a href="https://console.anthropic.com" target="_blank">Get key →</a></span>
+    </div>
+    <textarea id="inputText" placeholder="Paste your git diff here...
+
+Or describe your changes in plain English:
+
+'Refactored the authentication middleware to use JWT tokens instead of sessions. Added refresh token support and improved error handling for expired tokens.'
+
+Or paste the output of: git diff HEAD~1"></textarea>
+    <div class="generate-wrap">
+      <button class="btn-generate" id="generateBtn" onclick="generate()">
+        <span id="generateBtnText">✦ Generate</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- OUTPUT PANEL -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">// Output</span>
+      <div class="panel-actions">
+        <button class="btn-sm" id="copyBtn" onclick="copyAll()" style="display:none">Copy all</button>
+      </div>
+    </div>
+    <div id="outputArea" class="output-area">
+      <div class="output-placeholder">
+        <div class="output-placeholder-icon">✦</div>
+        <div class="output-placeholder-text">Your generated content will appear here</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="privacy-note">
+  Your API key and code never leave your browser. All requests go directly from your browser to Anthropic's API.
+</div>
+
+<footer>
+  <div class="footer-left">
+    Built by <a href="https://luciferankon.dev" target="_blank">luciferankon</a> · Open source
+  </div>
+  <div class="footer-right">
+    <a href="https://luciferankon.dev" target="_blank">Portfolio</a> &nbsp;·&nbsp;
+    <a href="https://github.com/luciferankon/shipready" target="_blank">GitHub</a>
+  </div>
+</footer>
+
+<script>
+const EXAMPLES = {
+  auth: `Refactored the authentication middleware to use JWT tokens instead of session-based auth. Added refresh token rotation, improved error handling for expired tokens, and removed the legacy session store dependency. Also updated all protected routes to use the new middleware.\n\nFiles changed:\n- middleware/auth.js (rewritten)\n- routes/user.js (updated)\n- config/session.js (deleted)\n- tests/auth.test.js (updated)`,
+  perf: `diff --git a/api/search.js b/api/search.js\n@@ -12,8 +12,12 @@ async function search(query) {\n-  const results = await db.query('SELECT * FROM products WHERE name LIKE ?', [\`%\${query}%\`]);\n-  return results;\n+  // Added index hint and pagination to fix N+1 and full table scan\n+  const results = await db.query(\n+    'SELECT id, name, price, category FROM products USE INDEX (idx_name) WHERE name LIKE ? LIMIT 50',\n+    [\`%\${query}%\`]\n+  );\n+  return results.map(r => ({ ...r, price: parseFloat(r.price) }));\n }`,
+  api: `Added a new POST /api/v2/webhooks endpoint that allows users to register webhook URLs for real-time event notifications. Supports filtering by event type (order.created, order.updated, order.cancelled). Includes HMAC signature verification for security, retry logic with exponential backoff, and delivery logs stored for 30 days.\n\nAlso added GET /api/v2/webhooks to list registered webhooks and DELETE /api/v2/webhooks/:id to remove them.`,
+  bug: `diff --git a/utils/dateFormatter.js b/utils/dateFormatter.js\n@@ -8,7 +8,7 @@ function formatDate(date, timezone) {\n-  return moment(date).format('YYYY-MM-DD');\n+  return moment(date).tz(timezone || 'UTC').format('YYYY-MM-DD');\n }\n\nFixes a bug where dates were being formatted in server local time instead of the user's timezone, causing incorrect date display for users in timezones west of UTC. Reported by 3 customers this week.`,
+  db: `Added database migration to support multi-tenancy. Created a new 'organisation_id' column on users, products, and orders tables. Added foreign key constraints and indices. Backfilled existing records with a default organisation_id of 1. Updated all queries in the data access layer to scope by organisation_id.\n\nThis is a breaking change — all API consumers must now pass an organisation context in the request header.`
+};
+
+const PROMPTS = {
+  pr: (input) => `You are an expert software engineer writing a GitHub Pull Request description. Based on the following code diff or change description, write a professional, concise PR description.
+
+Format your response EXACTLY as follows (use these exact section headers):
+TITLE: [A clear, imperative PR title under 72 characters]
+
+SUMMARY:
+[2-3 sentences explaining what changed and why]
+
+CHANGES:
+[Bullet list of the key changes made]
+
+TEST PLAN:
+[Bullet list of how to test this change]
+
+NOTES:
+[Any breaking changes, dependencies, or reviewer notes — or write "None" if not applicable]
+
+Input:
+${input}`,
+
+  commit: (input) => `You are an expert software engineer. Based on the following code diff or change description, write a perfect git commit message following the Conventional Commits specification.
+
+Format your response EXACTLY as follows:
+COMMIT: [type(scope): short description under 72 chars]
+
+BODY:
+[Optional longer explanation of what and why, not how. 2-4 sentences max. Leave blank if not needed.]
+
+FOOTER:
+[Breaking changes or issue refs like "Fixes #123" — or write "None"]
+
+Types: feat, fix, docs, style, refactor, perf, test, chore, ci
+
+Input:
+${input}`,
+
+  release: (input) => `You are a technical writer creating release notes for a software project. Based on the following code diff or change description, write clear, user-focused release notes.
+
+Format your response EXACTLY as follows:
+VERSION_TITLE: [A short descriptive title for this release]
+
+HIGHLIGHTS:
+[1-2 sentences summarising the most important changes for end users]
+
+WHATS_NEW:
+[Bullet list of new features]
+
+FIXED:
+[Bullet list of bug fixes — or write "None"]
+
+BREAKING:
+[Any breaking changes users need to know about — or write "None"]
+
+UPGRADE_NOTES:
+[Steps needed to upgrade, if any — or write "None required"]
+
+Input:
+${input}`
+};
+
+let currentMode = 'pr';
+let lastOutput = '';
+
+// Mode tabs
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentMode = tab.dataset.mode;
+    resetOutput();
+  });
+});
+
+// Example chips
+document.querySelectorAll('.example-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    const key = chip.dataset.example;
+    document.getElementById('inputText').value = EXAMPLES[key];
+    resetOutput();
+  });
+});
+
+// Clear button
+document.getElementById('clearBtn').addEventListener('click', () => {
+  document.getElementById('inputText').value = '';
+  resetOutput();
+});
+
+function resetOutput() {
+  lastOutput = '';
+  document.getElementById('copyBtn').style.display = 'none';
+  document.getElementById('outputArea').innerHTML = `
+    <div class="output-placeholder">
+      <div class="output-placeholder-icon">✦</div>
+      <div class="output-placeholder-text">Your generated content will appear here</div>
+    </div>`;
+}
+
+async function generate() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const inputText = document.getElementById('inputText').value.trim();
+  const btn = document.getElementById('generateBtn');
+  const btnText = document.getElementById('generateBtnText');
+
+  if (!apiKey) {
+    showError('Please enter your Anthropic API key above.');
+    return;
+  }
+  if (!inputText) {
+    showError('Please paste your git diff or describe your changes.');
+    return;
+  }
+
+  // Loading state
+  btn.disabled = true;
+  btn.classList.add('loading');
+  btnText.innerHTML = '<div class="spinner"></div> Generating...';
+  document.getElementById('outputArea').innerHTML = `
+    <div class="output-placeholder">
+      <div class="loading-dots"><span></span><span></span><span></span></div>
+      <div class="output-placeholder-text" style="color:var(--muted)">Analysing your changes...</div>
+    </div>`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: PROMPTS[currentMode](inputText) }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || `API error ${response.status}`);
+    }
+
+    const data = await response.json();
+    const text = data.content[0].text;
+    lastOutput = text;
+    renderOutput(text, currentMode);
+    document.getElementById('copyBtn').style.display = 'block';
+
+  } catch (err) {
+    showError(err.message || 'Something went wrong. Check your API key and try again.');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    btnText.innerHTML = '✦ Generate';
+  }
+}
+
+function renderOutput(text, mode) {
+  if (mode === 'pr') renderPR(text);
+  else if (mode === 'commit') renderCommit(text);
+  else renderRelease(text);
+}
+
+function renderPR(text) {
+  const sections = parseSection(text, ['TITLE', 'SUMMARY', 'CHANGES', 'TEST PLAN', 'NOTES']);
+  let html = '';
+
+  if (sections.TITLE) {
+    html += `<div class="output-section">
+      <div class="output-label">Title</div>
+      <div class="output-content commit">${escHtml(sections.TITLE)}</div>
+    </div>`;
+  }
+  if (sections.SUMMARY) {
+    html += `<div class="output-section">
+      <div class="output-label">Summary</div>
+      <div class="output-content">${escHtml(sections.SUMMARY)}</div>
+    </div>`;
+  }
+  if (sections.CHANGES) {
+    html += `<div class="output-section">
+      <div class="output-label">Changes</div>
+      <div class="output-content">${formatBullets(sections.CHANGES)}</div>
+    </div>`;
+  }
+  if (sections['TEST PLAN']) {
+    html += `<div class="output-section">
+      <div class="output-label">Test Plan</div>
+      <div class="output-content">${formatChecklist(sections['TEST PLAN'])}</div>
+    </div>`;
+  }
+  if (sections.NOTES && sections.NOTES !== 'None') {
+    html += `<div class="output-section">
+      <div class="output-label">Notes</div>
+      <div class="output-content">${escHtml(sections.NOTES)}</div>
+    </div>`;
+  }
+  document.getElementById('outputArea').innerHTML = html || `<div class="output-content">${escHtml(text)}</div>`;
+}
+
+function renderCommit(text) {
+  const sections = parseSection(text, ['COMMIT', 'BODY', 'FOOTER']);
+  let html = '';
+
+  if (sections.COMMIT) {
+    html += `<div class="output-section">
+      <div class="output-label">Commit Message</div>
+      <div class="output-content commit">${escHtml(sections.COMMIT)}</div>
+    </div>`;
+  }
+  if (sections.BODY && sections.BODY.trim()) {
+    html += `<div class="output-section">
+      <div class="output-label">Body</div>
+      <div class="output-content">${escHtml(sections.BODY)}</div>
+    </div>`;
+  }
+  if (sections.FOOTER && sections.FOOTER !== 'None') {
+    html += `<div class="output-section">
+      <div class="output-label">Footer</div>
+      <div class="output-content">${escHtml(sections.FOOTER)}</div>
+    </div>`;
+  }
+
+  // Copy command
+  const commitMsg = sections.COMMIT || '';
+  if (commitMsg) {
+    html += `<div class="output-section">
+      <div class="output-label">Ready to use</div>
+      <div class="output-content" style="color:var(--blue)">git commit -m "${escHtml(commitMsg)}"</div>
+    </div>`;
+  }
+  document.getElementById('outputArea').innerHTML = html || `<div class="output-content">${escHtml(text)}</div>`;
+}
+
+function renderRelease(text) {
+  const sections = parseSection(text, ['VERSION_TITLE', 'HIGHLIGHTS', 'WHATS_NEW', 'FIXED', 'BREAKING', 'UPGRADE_NOTES']);
+  let html = '';
+
+  if (sections.VERSION_TITLE) {
+    html += `<div class="output-section">
+      <div class="output-label">Release Title</div>
+      <div class="output-content commit">${escHtml(sections.VERSION_TITLE)}</div>
+    </div>`;
+  }
+  if (sections.HIGHLIGHTS) {
+    html += `<div class="output-section">
+      <div class="output-label">Highlights</div>
+      <div class="output-content">${escHtml(sections.HIGHLIGHTS)}</div>
+    </div>`;
+  }
+  if (sections.WHATS_NEW) {
+    html += `<div class="output-section">
+      <div class="output-label">What's New</div>
+      <div class="output-content">${formatBullets(sections.WHATS_NEW)}</div>
+    </div>`;
+  }
+  if (sections.FIXED && sections.FIXED !== 'None') {
+    html += `<div class="output-section">
+      <div class="output-label">Fixed</div>
+      <div class="output-content">${formatBullets(sections.FIXED)}</div>
+    </div>`;
+  }
+  if (sections.BREAKING && sections.BREAKING !== 'None') {
+    html += `<div class="output-section">
+      <div class="output-label" style="color:#ff8080">⚠ Breaking Changes</div>
+      <div class="output-content" style="border-color:rgba(255,80,80,0.2)">${escHtml(sections.BREAKING)}</div>
+    </div>`;
+  }
+  if (sections.UPGRADE_NOTES && sections.UPGRADE_NOTES !== 'None required') {
+    html += `<div class="output-section">
+      <div class="output-label">Upgrade Notes</div>
+      <div class="output-content">${escHtml(sections.UPGRADE_NOTES)}</div>
+    </div>`;
+  }
+  document.getElementById('outputArea').innerHTML = html || `<div class="output-content">${escHtml(text)}</div>`;
+}
+
+function parseSection(text, keys) {
+  const result = {};
+  // Try "KEY:" format and "KEY:\n" format
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    const nextKey = keys[i + 1];
+    const pattern = new RegExp(`${key}:\\s*([\\s\\S]*?)${nextKey ? `(?=${nextKey}:)` : '$'}`, 'i');
+    const match = text.match(pattern);
+    if (match) result[key] = match[1].trim();
+  }
+  return result;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function formatBullets(text) {
+  return text.split('\n')
+    .filter(l => l.trim())
+    .map(l => {
+      const clean = l.replace(/^[-*•]\s*/, '').trim();
+      return `<div class="checklist-item">${escHtml(clean)}</div>`;
+    }).join('');
+}
+
+function formatChecklist(text) {
+  return text.split('\n')
+    .filter(l => l.trim())
+    .map(l => {
+      const clean = l.replace(/^[-*•\[\]x ]\s*/i, '').trim();
+      return `<div class="checklist-item">${escHtml(clean)}</div>`;
+    }).join('');
+}
+
+function showError(msg) {
+  const existing = document.querySelector('.error-banner');
+  if (existing) existing.remove();
+  const err = document.createElement('div');
+  err.className = 'error-banner';
+  err.textContent = msg;
+  document.getElementById('outputArea').insertAdjacentElement('beforebegin', err);
+  setTimeout(() => err.remove(), 6000);
+}
+
+async function copyAll() {
+  if (!lastOutput) return;
+  try {
+    await navigator.clipboard.writeText(lastOutput);
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy all';
+      btn.classList.remove('copied');
+    }, 2000);
+  } catch(e) {}
+}
+
+// Enter key shortcut
+document.addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') generate();
+});
+</script>
+</body>
+</html>
